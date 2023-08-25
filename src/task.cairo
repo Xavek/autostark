@@ -93,7 +93,8 @@ mod Task {
         total_supply: u256,
         name: felt252,
         balances: LegacyMap<ContractAddress, u256>,
-        mint_list: LegacyMap<ContractAddress, bool>
+        mint_list: LegacyMap<ContractAddress, bool>,
+        executed_register: LegacyMap<felt252, u64>
     }
 
     #[derive(Serde, Drop, storage_access::StorageAccess)]
@@ -183,6 +184,7 @@ mod Task {
             let mut arr = calls;
             let arr_res = arr.pop_front().unwrap();
             self.transfer_from(arr_res.from, arr_res.to, arr_res.amount)
+            self.executed_register.write(id, get_block_timestamp())
         }
 
         fn get_execution_window(self: @ContractState, id: felt252) -> (u64, u64) {
