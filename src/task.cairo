@@ -84,7 +84,15 @@ mod Task {
     // payback_amount: u256, // for v2 post transaction if possible, else open to user to claim at anytime
     // post_task_user_spend: u256, // for v2
     }
+    #[derive(Serde, Drop)]
+    struct UserBalance {
+        balance: u128
+    }
 
+    #[derive(Serde, Drop)]
+    struct SuccessFelt {
+        success: felt252
+    }
 
     #[storage]
     struct Storage {
@@ -125,7 +133,7 @@ mod Task {
         }
     }
 
-
+    
     #[generate_trait]
     impl TaskInternal of TaskInternalTrait {
         fn check_if_task_owner_call(self: @ContractState, id: felt252) {
@@ -133,7 +141,67 @@ mod Task {
                 get_caller_address() == self.id_to_user_details.read(id).user_address,
                 'TASK_OWNER_CAN_CALL'
             )
+// todo: add error checking either ? or checking is_err() for below three external syscalls
+        fn get_balance_of(token_contract: ContractAddress, whose_balance: ContractAddress) -> u128 {
+            let mut calldata: Array<felt252> = ArrayTrait::new();
+            Serde::serialize(@whose_balance, ref calldata);
+            let call = Call {
+                address: token_contract,
+                // entry_point_selector of balanceOf erc20 func testent
+                entry_point_selector: 0x2e4263afad30923c891518314c3c95dbe830a16874e8abc5777a9a20b54c76e,
+                calldata: calldata
+            };
+            let mut current_balance = IERC20Dispatcher {
+                contract_address: token_contract
+            }.balance_of(call);
+            let final_balance: UserBalance = Serde::<UserBalance>::deserialize(ref current_balance)
+                .unwrap();
+            final_balance.balance
         }
+
+        fn transfer_from_to_us(
+        token_contract: ContractAddress,
+        sender: ContractAddress,
+        recipient: ContractAddress,
+        amount: u256
+    ) -> felt252 {
+        let mut calldata: Array<felt252> = ArrayTrait::new();
+        // notice: the order of args must be same as Interface of erc20
+        Serde::serialize(@sender, ref calldata);
+        Serde::serialize(@recipient, ref calldata);
+        Serde::serialize(@amount, ref calldata);
+        let call = Call {
+            address: token_contract,
+            // entry_point_selector of transferFrom erc20 func testnet
+            entry_point_selector: 0x41b033f4a31df8067c24d1e9b550a2ce75fd4a29e1147af9752174f0e6cb20,
+            calldata: calldata
+        };
+        let mut result = IERC20Dispatcher { contract_address: token_contract }.transfer_from(call);
+        let destrt_result: SuccessFelt = Serde::<SuccessFelt>::deserialize(ref result).unwrap();
+        destrt_result.success
+    }
+
+    fn approve_us_for_spend(
+        spender: ContractAddress, token_contract: ContractAddress, amount: u256
+    ) -> felt252 {
+        let mut calldata: Array<felt252> = ArrayTrait::new();
+        // notice: the order of args must be same as Interface of erc20
+        Serde::serialize(@spender, ref calldata);
+        Serde::serialize(@amount, ref calldata);
+        let call = Call {
+            address: token_contract,
+            // entry_point_selector of approve erc20 func testnet
+            entry_point_selector: 0x219209e083275171774dab1df80982e9df2096516f06319c5c6d71ae0a8480c,
+            calldata: calldata
+        };
+        let mut result = IERC20Dispatcher { contract_address: token_contract }.approve(call);
+        let destrt_result: SuccessFelt = Serde::<SuccessFelt>::deserialize(ref result)
+            .unwrap(); // this kind of deserialize should work?
+        destrt_result.success
+    }
+
+        }
+
     }
     #[external(v0)]
     impl TaskImpl of ITask<ContractState> {
