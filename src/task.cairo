@@ -84,7 +84,15 @@ mod Task {
     // payback_amount: u256, // for v2 post transaction if possible, else open to user to claim at anytime
     // post_task_user_spend: u256, // for v2
     }
+    #[derive(Serde, Drop)]
+    struct UserBalance {
+        balance: u128
+    }
 
+    #[derive(Serde, Drop)]
+    struct SuccessFelt {
+        success: felt252
+    }
 
     #[storage]
     struct Storage {
